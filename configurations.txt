@@ -1,0 +1,65 @@
+curl --location 'http://localhost:8083/connectors' \
+--header 'Content-Type: application/json' \
+--data '{
+  "name": "jdbc-sink-postgres",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "processed-topic",
+    "connection.url": "jdbc:postgresql://postgres:5432/postgres",
+    "connection.user": "postgres",
+    "connection.password": "postgres",
+    "auto.create": "true",
+    "auto.evolve": "true",
+    "insert.mode": "insert",
+    "pk.mode": "none",
+    "table.name.format": "transactions",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    "batch.size": "3000",
+    "delete.enabled": "false"
+  }
+}
+'
+
+
+curl --location 'http://localhost:8083/connectors' \
+--header 'Content-Type: application/json' \
+--data '{
+    "name": "source-csv-spooldir-007",
+    "config": {
+      "connector.class": "com.github.jcustenborder.kafka.connect.spooldir.SpoolDirCsvSourceConnector",
+      "topic": "files-topic",
+      "input.path": "/data/unprocessed",
+      "finished.path": "/data/processed",
+      "error.path": "/data/error",
+      "input.file.pattern": ".*\\.csv",
+      "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "csv.first.row.as.header": "true",
+      "schema.generation.enabled": "true"
+    }
+  }'
+
+docker exec -it postgres bash
+
+psql -U postgres -d postgres
+
+CREATE TABLE IF NOT EXISTS transactions (
+    transaction_id VARCHAR(255) PRIMARY KEY,
+    beneficiary_name VARCHAR(255),
+    date VARCHAR(50),
+    time VARCHAR(50),
+    amount DOUBLE PRECISION,
+    account_number VARCHAR(50)
+);
+
+
+
+Invoke-RestMethod -Uri "http://localhost:8083/connectors" -Method Get
+Invoke-RestMethod -Uri "http://localhost:8083/connectors/jdbc-sink-postgres" -Method Delete
+Invoke-RestMethod -Uri "http://localhost:8083/connectors/source-csv-spooldir-008" -Method Delete
+ALTER TABLE transactions
+ADD COLUMN filename VARCHAR(255);
